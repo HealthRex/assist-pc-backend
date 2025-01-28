@@ -1,17 +1,8 @@
 import { Injectable } from '@nestjs/common';
-import {
-  GoogleGenerativeAI,
-  GenerativeModel,
-  GenerateContentResult,
-} from '@google/generative-ai';
 import { ReferralRequest } from '../models/referralRequest';
+import Anthropic from '@anthropic-ai/sdk';
 
-const genAI: GoogleGenerativeAI = new GoogleGenerativeAI(
-  process.env.API_KEY as string,
-);
-const model: GenerativeModel = genAI.getGenerativeModel({
-  model: 'gemini-1.5-flash',
-});
+const client = new Anthropic();
 
 @Injectable()
 export class AppService {
@@ -19,12 +10,17 @@ export class AppService {
     return 'Hello World!';
   }
 
-  async postReferralQuestion(request: ReferralRequest): Promise<string> {
+  async postReferralQuestion(request: ReferralRequest): Promise<any> {
     console.log('request: ', request);
-    const result: GenerateContentResult = await model.generateContent(
-      request.question,
-    );
-    console.log(result.response.text());
-    return result.response.text();
+
+    const params: Anthropic.MessageCreateParams = {
+      max_tokens: 1024,
+      messages: [{ role: 'user', content: request.question }],
+      model: 'claude-3-5-sonnet-latest',
+    };
+    const result: Anthropic.Message = await client.messages.create(params);
+
+    console.log(result.content);
+    return result.content;
   }
 }
