@@ -1,5 +1,52 @@
 import { Type, Transform } from 'class-transformer';
 import { ApiProperty } from '@nestjs/swagger';
+import { z } from 'zod';
+import { JSONSchema } from 'json-schema-to-ts';
+
+// export const referralResponseSchema = z.object({
+//   specialistSummary: z.string(),
+//   templateSelectionProcess: z.string(),
+//   populatedTemplate: z.array(z.record(z.string(), z.string())),
+//   specialistAIResponse: z.object({
+//     summaryResponse: z.string(),
+//     suggestedLabOrders: z.array(z.string()),
+//     suggestedImaging: z.array(z.string()),
+//     suggestedMedications: z.array(z.string()),
+//   }),
+// });
+export const referralResponseSchema = {
+  type: 'object',
+  properties: {
+    specialistSummary: { type: 'string' },
+    templateSelectionProcess: { type: 'string' },
+    populatedTemplate: {
+      type: 'string',
+      // type: 'array',
+      // items: {
+      //   type: 'object',
+      //   additionalProperties: { type: 'string' },
+      // },
+    },
+    specialistAIResponse: {
+      type: 'object',
+      properties: {
+        summaryResponse: { type: 'string' },
+        suggestedLabOrders: {
+          type: 'array',
+          items: { type: 'string' },
+        },
+        suggestedImaging: {
+          type: 'array',
+          items: { type: 'string' },
+        },
+        suggestedMedications: {
+          type: 'array',
+          items: { type: 'string' },
+        },
+      },
+    },
+  },
+};
 
 export class PopulatedTemplate {
   @ApiProperty({
@@ -18,9 +65,9 @@ export class PopulatedTemplate {
 // {
 //   "1_specialistSummary": string,
 //   "2_populatedTemplate": {
-//   "a_templateSelectionProcess": string,
+//     "a_templateSelectionProcess": string,
 //     "b_strictTemplateAdherence": string,
-// },
+//    },
 //   "3_specialistAIResponse": string
 // }
 export class ReferralResponse {

@@ -1,11 +1,14 @@
 import { Injectable } from '@nestjs/common';
-import { generateText, LanguageModelV1 } from 'ai';
+import { generateObject, generateText, jsonSchema, LanguageModelV1 } from 'ai';
 import { anthropic } from '@ai-sdk/anthropic';
 import { google } from '@ai-sdk/google';
 import { ReferralRequest } from '../models/referralRequest';
 import * as fs from 'node:fs';
 import { join } from 'path';
-import { ReferralResponse } from '../models/referralResponse';
+import {
+  ReferralResponse,
+  referralResponseSchema,
+} from '../models/referralResponse';
 
 enum AIProvider {
   Claude = 'CLAUDE',
@@ -89,6 +92,9 @@ export class AppService {
           ],
         },
       ],
+      // schema: zodSchema(z.instanceof(ReferralResponse)),
+      // //@ts-expect-error("type string cannot be understood for some reason")
+      // schema: jsonSchema(referralResponseSchema),
     };
 
     // console.log('referralTemplatesBase64: ', referralTemplatesBase64);
@@ -118,7 +124,7 @@ export class AppService {
       case AIProvider.Claude:
         return anthropic('claude-3-opus-20240229');
       case AIProvider.Gemini:
-        return google('models/gemini-2.0-flash-exp');
+        return google('models/gemini-2.0-flash');
       default:
         throw new Error('unknown AI_PROVIDER type selected');
     }
