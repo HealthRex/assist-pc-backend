@@ -36,10 +36,20 @@ export class AppController {
       'Successfully received streamed AI response to clinical question.',
     type: ReferralResponse,
   })
-  postReferralQuestionStreamed(
+  async postReferralQuestionStreamed(
     @Body() request: ReferralRequest,
-  ): Observable<{ data: ReferralResponse }> {
+  ): Promise<Observable<{ data: ReferralResponse }>> {
     this.logger.debug('controller request', request);
-    return this.appService.postReferralQuestionStreamed(request);
+    return await this.appService.postReferralQuestionStreamed(request);
+  }
+
+  @Post('/ask-pathway')
+  @ApiCreatedResponse({
+    description:
+      'Successfully received Pathway AI response to a clarifying question.',
+  })
+  async postPathwayQuestion(@Body() request: string[]): Promise<string> {
+    this.logger.debug('controller request', request);
+    return await this.appService.postPathwayQuestion(request);
   }
 }

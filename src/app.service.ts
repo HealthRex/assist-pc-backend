@@ -16,7 +16,7 @@ import { ReferralResponse } from './models/referralResponse';
 import { TemplateSelectorService } from './template-selector/template-selector.service';
 import { PathwayService } from './pathway/pathway.service';
 import { SpecialistAIResponse } from './models/specialistAIResponse';
-import { Observable } from 'rxjs';
+import { concatWith, map, Observable, tap } from 'rxjs';
 import { fromReadableStreamLike } from 'rxjs/internal/observable/innerFrom';
 import { LLMResponse, llmResponseSchema } from './models/llmResponse';
 
@@ -62,78 +62,39 @@ export class AppService {
     return response;
   }
 
-  postReferralQuestionStreamed2(
+  async postReferralQuestionStreamed(
     request: ReferralRequest,
-  ): Observable<{ data: ReferralResponse }> {
+  ): Promise<Observable<{ data: ReferralResponse }>> {
+    const llmResponseObservable: Observable<ReferralResponse> =
+      await this.queryLLMStreamed(request);
+
     return new Observable((subscriber) => {
       this.logger.debug('request: ', request);
 
-      this.queryLLMStreamed(request)
-        .then((llmResponseStream) => {
-          let accumulatedResponse: ReferralResponse = new ReferralResponse();
-          llmResponseStream
-            .subscribe((next: ReferralResponse) => {
-              accumulatedResponse = next;
-              subscriber.next({ data: accumulatedResponse });
-            })
-            .add(() =>
-              this.queryPathwayStreamed(request, accumulatedResponse).subscribe(
-                (specialistAIResponse) => {
-                  accumulatedResponse.specialistAIResponse =
-                    specialistAIResponse;
-
-                  subscriber.next({ data: accumulatedResponse });
-
-                  this.logger.debug('response: ', accumulatedResponse);
-                  subscriber.complete();
-                },
-              ),
-            );
-        })
-
-        .catch((reason) => {
-          subscriber.error(reason);
-        });
-    });
-  }
-
-  postReferralQuestionStreamed(
-    request: ReferralRequest,
-  ): Observable<{ data: ReferralResponse }> {
-    return new Observable((subscriber) => {
-      this.logger.debug('request: ', request);
-
-      this.queryLLMStreamed(request)
-        .then((llmResponseStream) => {
-          let accumulatedResponse: ReferralResponse = new ReferralResponse();
-          llmResponseStream
-            .subscribe((next: ReferralResponse) => {
-              accumulatedResponse = next;
-              subscriber.next({ data: accumulatedResponse });
-            })
-            .add(() => {
-              this.queryPathway(request, accumulatedResponse)
-                .then((specialistAIResponse) => {
-                  accumulatedResponse.specialistAIResponse =
-                    specialistAIResponse;
-
-                  subscriber.next({ data: accumulatedResponse });
-
-                  this.logger.debug('response: ', accumulatedResponse);
-                  subscriber.complete();
-                })
-                .catch((reason) => {
-                  this.logger.error(
-                    'error occurred trying to query Pathway: ',
-                    reason,
-                  );
-                  subscriber.error(reason);
-                });
-            });
-        })
-        .catch((reason) => {
-          this.logger.error('error occurred trying to query LLM: ', reason);
-          subscriber.error(reason);
+      let accumulatedResponse: ReferralResponse = new ReferralResponse();
+      llmResponseObservable
+        .pipe(
+          tap((next) => {
+            accumulatedResponse = next;
+          }),
+          concatWith(
+            this.queryPathwayStreamed(request, accumulatedResponse).pipe(
+              map((specialistAIResponse: SpecialistAIResponse) => {
+                accumulatedResponse.specialistAIResponse = specialistAIResponse;
+                return accumulatedResponse;
+              }),
+            ),
+          ),
+        )
+        .subscribe({
+          next: (next: ReferralResponse) => {
+            subscriber.next({ data: next });
+          },
+          complete: () => subscriber.complete(),
+          error: (reason) => {
+            this.logger.error('error querying LLM: ', reason);
+            subscriber.error(reason);
+          },
         });
     });
   }
@@ -159,7 +120,9 @@ export class AppService {
 
     const { partialObjectStream } = streamObject(input);
 
-    return fromReadableStreamLike(partialObjectStream as ReadableStream);
+    return fromReadableStreamLike<ReferralResponse>(
+      partialObjectStream as ReadableStream,
+    );
   }
 
   private async prepareLLMInput(request: ReferralRequest) {
@@ -250,5 +213,9 @@ export class AppService {
       default:
         throw new Error('unknown AI_PROVIDER type selected');
     }
+  }
+
+  async postPathwayQuestion(request: string[]): Promise<string> {
+    return this.pathwayService.retrieveChatAnswer(request);
   }
 }
